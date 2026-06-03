@@ -9,6 +9,8 @@ cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 ARCHIVO = "notas.json"
 
+CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
+
 def cargar_notas():
     if os.path.exists(ARCHIVO):
         with open(ARCHIVO, "r") as f:
@@ -25,18 +27,31 @@ def mostrar_menu():
     print("==========================")
     print("1. Escribir una nota")
     print("2. Ver mis notas")
-    print("3. Analizar notas con IA")
-    print("4. Eliminar una nota")
-    print("5. Buscar notas")
-    print("6. preguntarle a la IA sobre mis notas")
-    print("7. Salir")
+    print("3. Ver notas por categoría")
+    print("4. Analizar notas con IA")
+    print("5. Eliminar una nota")
+    print("6. Buscar notas")
+    print("7. Preguntarle a la IA sobre mis notas")
+    print("8. Salir")
     print("==========================")
 
+def elegir_categoria():
+    print("--- Categorías ---")
+    for i, cat in enumerate(CATEGORIAS):
+        print(f"{i + 1}. {cat}")
+    numero = input("Elige una categoría: ")
+    if numero.isdigit():
+        indice = int(numero) - 1
+        if 0 <= indice < len(CATEGORIAS):
+            return CATEGORIAS[indice]
+    return "otro"
+
 def escribir_nota(notas):
-    nota = input("Escribe tu nota: ")
-    notas.append(nota)
+    texto = input("Escribe tu nota: ")
+    categoria = elegir_categoria()
+    notas.append({"texto": texto, "categoria": categoria})
     guardar_notas(notas)
-    print("✓ Nota guardada")
+    print(f"✓ Nota guardada en '{categoria}'")
 
 def ver_notas(notas):
     if len(notas) == 0:
@@ -44,22 +59,33 @@ def ver_notas(notas):
     else:
         print("--- Tus notas ---")
         for i, nota in enumerate(notas):
-            print(f"{i + 1}. {nota}")
+            print(f"{i + 1}. [{nota['categoria']}] {nota['texto']}")
+
+def ver_por_categoria(notas):
+    if len(notas) == 0:
+        print("No tienes notas todavía")
+        return
+    categoria = elegir_categoria()
+    filtradas = [n for n in notas if n["categoria"] == categoria]
+    if len(filtradas) == 0:
+        print(f"No tienes notas en '{categoria}'")
+    else:
+        print(f"--- Notas en '{categoria}' ---")
+        for i, nota in enumerate(filtradas):
+            print(f"{i + 1}. {nota['texto']}")
 
 def eliminar_nota(notas):
     if len(notas) == 0:
         print("No tienes notas para eliminar")
         return
-
     ver_notas(notas)
     numero = input("¿Cuál nota quieres eliminar? (escribe el número): ")
-
     if numero.isdigit():
         indice = int(numero) - 1
         if 0 <= indice < len(notas):
             eliminada = notas.pop(indice)
             guardar_notas(notas)
-            print(f"✓ Nota eliminada: '{eliminada}'")
+            print(f"✓ Nota eliminada: '{eliminada['texto']}'")
         else:
             print("Número fuera de rango")
     else:
@@ -69,26 +95,21 @@ def buscar_notas(notas):
     if len(notas) == 0:
         print("No tienes notas para buscar")
         return
-
     palabra = input("¿Qué quieres buscar?: ")
-    resultados = [nota for nota in notas if palabra.lower() in nota.lower()]
-
+    resultados = [n for n in notas if palabra.lower() in n["texto"].lower()]
     if len(resultados) == 0:
         print(f"No encontré notas con '{palabra}'")
     else:
         print(f"--- Encontré {len(resultados)} nota(s) ---")
         for i, nota in enumerate(resultados):
-            print(f"{i + 1}. {nota}")
+            print(f"{i + 1}. [{nota['categoria']}] {nota['texto']}")
 
 def analizar_notas(notas):
     if len(notas) == 0:
         print("No tienes notas para analizar")
         return
-
     print("⏳ Analizando tus notas con IA...")
-
-    texto = "\n".join(notas)
-
+    texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
     respuesta = cliente.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
@@ -102,44 +123,16 @@ def analizar_notas(notas):
             }
         ]
     )
-
     print("\n--- Análisis de la IA ---")
     print(respuesta.choices[0].message.content)
-
-def main():
-    notas = cargar_notas()
-    while True:
-        mostrar_menu()
-        opcion = input("Elige una opción: ")
-
-        if opcion == "1":
-            escribir_nota(notas)
-        elif opcion == "2":
-            ver_notas(notas)
-        elif opcion == "3":
-            analizar_notas(notas)
-        elif opcion == "4":
-            eliminar_nota(notas)
-        elif opcion == "5":
-            buscar_notas(notas)
-        elif opcion == "6":
-            preguntar_ia(notas)
-        elif opcion == "7":
-            print("¡Hasta luego!")
-            break
-        else:
-            print("Opción no válida, intenta de nuevo")
 
 def preguntar_ia(notas):
     if len(notas) == 0:
         print("No tienes notas todavía")
         return
-
-    texto = "\n".join(notas)
+    texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
     pregunta = input("¿Qué quieres preguntarle a la IA sobre tus notas?: ")
-
     print("⏳ Consultando a la IA...")
-
     respuesta = cliente.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
@@ -153,8 +146,33 @@ def preguntar_ia(notas):
             }
         ]
     )
-
     print("\n--- Respuesta de la IA ---")
     print(respuesta.choices[0].message.content)
+
+def main():
+    notas = cargar_notas()
+    while True:
+        mostrar_menu()
+        opcion = input("Elige una opción: ")
+
+        if opcion == "1":
+            escribir_nota(notas)
+        elif opcion == "2":
+            ver_notas(notas)
+        elif opcion == "3":
+            ver_por_categoria(notas)
+        elif opcion == "4":
+            analizar_notas(notas)
+        elif opcion == "5":
+            eliminar_nota(notas)
+        elif opcion == "6":
+            buscar_notas(notas)
+        elif opcion == "7":
+            preguntar_ia(notas)
+        elif opcion == "8":
+            print("¡Hasta luego!")
+            break
+        else:
+            print("Opción no válida, intenta de nuevo")
 
 main()
