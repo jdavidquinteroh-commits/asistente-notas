@@ -26,7 +26,8 @@ def mostrar_menu():
     print("1. Escribir una nota")
     print("2. Ver mis notas")
     print("3. Analizar notas con IA")
-    print("4. Salir")
+    print("4. Eliminar una nota")
+    print("5. Salir")
     print("==========================")
 
 def escribir_nota(notas):
@@ -42,6 +43,25 @@ def ver_notas(notas):
         print("--- Tus notas ---")
         for i, nota in enumerate(notas):
             print(f"{i + 1}. {nota}")
+
+def eliminar_nota(notas):
+    if len(notas) == 0:
+        print("No tienes notas para eliminar")
+        return
+
+    ver_notas(notas)
+    numero = input("¿Cuál nota quieres eliminar? (escribe el número): ")
+
+    if numero.isdigit():
+        indice = int(numero) - 1
+        if 0 <= indice < len(notas):
+            eliminada = notas.pop(indice)
+            guardar_notas(notas)
+            print(f"✓ Nota eliminada: '{eliminada}'")
+        else:
+            print("Número fuera de rango")
+    else:
+        print("Escribe un número válido")
 
 def analizar_notas(notas):
     if len(notas) == 0:
@@ -82,6 +102,8 @@ def main():
         elif opcion == "3":
             analizar_notas(notas)
         elif opcion == "4":
+            eliminar_nota(notas)
+        elif opcion == "5":
             print("¡Hasta luego!")
             break
         else:
