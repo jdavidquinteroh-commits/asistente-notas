@@ -27,7 +27,8 @@ def mostrar_menu():
     print("2. Ver mis notas")
     print("3. Analizar notas con IA")
     print("4. Eliminar una nota")
-    print("5. Salir")
+    print("5. Buscar notas")
+    print("6. Salir")
     print("==========================")
 
 def escribir_nota(notas):
@@ -62,6 +63,21 @@ def eliminar_nota(notas):
             print("Número fuera de rango")
     else:
         print("Escribe un número válido")
+
+def buscar_notas(notas):
+    if len(notas) == 0:
+        print("No tienes notas para buscar")
+        return
+
+    palabra = input("¿Qué quieres buscar?: ")
+    resultados = [nota for nota in notas if palabra.lower() in nota.lower()]
+
+    if len(resultados) == 0:
+        print(f"No encontré notas con '{palabra}'")
+    else:
+        print(f"--- Encontré {len(resultados)} nota(s) ---")
+        for i, nota in enumerate(resultados):
+            print(f"{i + 1}. {nota}")
 
 def analizar_notas(notas):
     if len(notas) == 0:
@@ -104,6 +120,8 @@ def main():
         elif opcion == "4":
             eliminar_nota(notas)
         elif opcion == "5":
+            buscar_notas(notas)
+        elif opcion == "6":
             print("¡Hasta luego!")
             break
         else:
