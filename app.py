@@ -1,0 +1,118 @@
+import json
+import os
+import streamlit as st
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
+
+cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+ARCHIVO = "notas.json"
+CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
+
+def cargar_notas():
+    if os.path.exists(ARCHIVO):
+        with open(ARCHIVO, "r") as f:
+            return json.load(f)
+    return []
+
+def guardar_notas(notas):
+    with open(ARCHIVO, "w") as f:
+        json.dump(notas, f)
+
+st.title("📝 Asistente de Notas con IA")
+
+notas = cargar_notas()
+
+opcion = st.sidebar.selectbox("¿Qué quieres hacer?", [
+    "Escribir una nota",
+    "Ver mis notas",
+    "Ver por categoría",
+    "Buscar notas",
+    "Analizar con IA",
+    "Preguntarle a la IA"
+])
+
+if opcion == "Escribir una nota":
+    st.header("✏️ Nueva nota")
+    texto = st.text_area("Escribe tu nota aquí")
+    categoria = st.selectbox("Categoría", CATEGORIAS)
+    if st.button("Guardar nota"):
+        if texto.strip():
+            notas.append({"texto": texto, "categoria": categoria})
+            guardar_notas(notas)
+            st.success(f"✓ Nota guardada en '{categoria}'")
+        else:
+            st.warning("Escribe algo antes de guardar")
+
+elif opcion == "Ver mis notas":
+    st.header("📋 Todas mis notas")
+    if len(notas) == 0:
+        st.info("No tienes notas todavía")
+    else:
+        for i, nota in enumerate(notas):
+            with st.expander(f"{i + 1}. [{nota['categoria']}] {nota['texto'][:50]}..."):
+                st.write(nota["texto"])
+                if st.button(f"Eliminar", key=f"del_{i}"):
+                    notas.pop(i)
+                    guardar_notas(notas)
+                    st.rerun()
+
+elif opcion == "Ver por categoría":
+    st.header("🗂️ Notas por categoría")
+    categoria = st.selectbox("Elige una categoría", CATEGORIAS)
+    filtradas = [n for n in notas if n["categoria"] == categoria]
+    if len(filtradas) == 0:
+        st.info(f"No tienes notas en '{categoria}'")
+    else:
+        for i, nota in enumerate(filtradas):
+            st.write(f"{i + 1}. {nota['texto']}")
+
+elif opcion == "Buscar notas":
+    st.header("🔍 Buscar notas")
+    palabra = st.text_input("¿Qué quieres buscar?")
+    if palabra:
+        resultados = [n for n in notas if palabra.lower() in n["texto"].lower()]
+        if len(resultados) == 0:
+            st.warning(f"No encontré notas con '{palabra}'")
+        else:
+            st.success(f"Encontré {len(resultados)} nota(s)")
+            for i, nota in enumerate(resultados):
+                st.write(f"{i + 1}. [{nota['categoria']}] {nota['texto']}")
+
+elif opcion == "Analizar con IA":
+    st.header("🤖 Análisis con IA")
+    if len(notas) == 0:
+        st.info("No tienes notas para analizar")
+    else:
+        if st.button("Analizar mis notas"):
+            with st.spinner("Analizando..."):
+                texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
+                respuesta = cliente.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {"role": "system", "content": "Eres un asistente personal que ayuda a organizar y resumir notas."},
+                        {"role": "user", "content": f"Estas son mis notas:\n{texto}\n\nResúmelas y dime qué temas principales estoy trabajando."}
+                    ]
+                )
+                st.write(respuesta.choices[0].message.content)
+
+elif opcion == "Preguntarle a la IA":
+    st.header("💬 Preguntarle a la IA")
+    if len(notas) == 0:
+        st.info("No tienes notas todavía")
+    else:
+        pregunta = st.text_input("¿Qué quieres preguntarle a la IA sobre tus notas?")
+        if st.button("Preguntar"):
+            if pregunta.strip():
+                with st.spinner("Consultando..."):
+                    texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
+                    respuesta = cliente.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=[
+                            {"role": "system", "content": f"Eres un asistente personal. Estas son las notas del usuario:\n{texto}\n\nResponde basándote únicamente en esas notas."},
+                            {"role": "user", "content": pregunta}
+                        ]
+                    )
+                    st.write(respuesta.choices[0].message.content)
