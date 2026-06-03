@@ -28,7 +28,8 @@ def mostrar_menu():
     print("3. Analizar notas con IA")
     print("4. Eliminar una nota")
     print("5. Buscar notas")
-    print("6. Salir")
+    print("6. preguntarle a la IA sobre mis notas")
+    print("7. Salir")
     print("==========================")
 
 def escribir_nota(notas):
@@ -122,9 +123,38 @@ def main():
         elif opcion == "5":
             buscar_notas(notas)
         elif opcion == "6":
+            preguntar_ia(notas)
+        elif opcion == "7":
             print("¡Hasta luego!")
             break
         else:
             print("Opción no válida, intenta de nuevo")
+
+def preguntar_ia(notas):
+    if len(notas) == 0:
+        print("No tienes notas todavía")
+        return
+
+    texto = "\n".join(notas)
+    pregunta = input("¿Qué quieres preguntarle a la IA sobre tus notas?: ")
+
+    print("⏳ Consultando a la IA...")
+
+    respuesta = cliente.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "system",
+                "content": f"Eres un asistente personal. Estas son las notas del usuario:\n{texto}\n\nResponde las preguntas basándote únicamente en esas notas."
+            },
+            {
+                "role": "user",
+                "content": pregunta
+            }
+        ]
+    )
+
+    print("\n--- Respuesta de la IA ---")
+    print(respuesta.choices[0].message.content)
 
 main()
