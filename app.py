@@ -1,10 +1,10 @@
 import json
 import os
 import streamlit as st
-from dotenv import load_dotenv
 from groq import Groq
 
-load_dotenv()
+ARCHIVO = "notas.json"
+CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
 
 try:
     api_key = st.secrets["GROQ_API_KEY"]
@@ -12,9 +12,6 @@ except:
     api_key = os.getenv("GROQ_API_KEY")
 
 cliente = Groq(api_key=api_key)
-
-ARCHIVO = "notas.json"
-CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
 
 def cargar_notas():
     if os.path.exists(ARCHIVO):
@@ -57,7 +54,7 @@ elif opcion == "Ver mis notas":
         st.info("No tienes notas todavía")
     else:
         for i, nota in enumerate(notas):
-            with st.expander(f"{i + 1}. [{nota['categoria']}] {nota['texto'][:50]}..."):
+            with st.expander(f"{i + 1}. [{nota['categoria']}] {nota['texto'][:50]}"):
                 st.write(nota["texto"])
                 if st.button(f"Eliminar", key=f"del_{i}"):
                     notas.pop(i)
