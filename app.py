@@ -6,7 +6,11 @@ from groq import Groq
 
 load_dotenv()
 
-api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except:
+    api_key = os.getenv("GROQ_API_KEY")
+
 cliente = Groq(api_key=api_key)
 
 ARCHIVO = "notas.json"
