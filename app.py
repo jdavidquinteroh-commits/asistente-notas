@@ -6,7 +6,8 @@ from groq import Groq
 
 load_dotenv()
 
-cliente = Groq(api_key=os.getenv("GROQ_API_KEY"))
+api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+cliente = Groq(api_key=api_key)
 
 ARCHIVO = "notas.json"
 CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
