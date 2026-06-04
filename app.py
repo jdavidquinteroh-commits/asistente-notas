@@ -2,9 +2,9 @@ import json
 import os
 import streamlit as st
 from groq import Groq
+from dotenv import load_dotenv
 
-ARCHIVO = "notas.json"
-CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
+load_dotenv()
 
 try:
     api_key = st.secrets["GROQ_API_KEY"]
@@ -12,6 +12,9 @@ except:
     api_key = os.getenv("GROQ_API_KEY")
 
 cliente = Groq(api_key=api_key)
+
+ARCHIVO = "notas.json"
+CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
 
 def cargar_notas():
     if os.path.exists(ARCHIVO):
@@ -105,16 +108,33 @@ elif opcion == "Preguntarle a la IA":
     if len(notas) == 0:
         st.info("No tienes notas todavía")
     else:
-        pregunta = st.text_input("¿Qué quieres preguntarle a la IA sobre tus notas?")
-        if st.button("Preguntar"):
-            if pregunta.strip():
-                with st.spinner("Consultando..."):
-                    texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
-                    respuesta = cliente.chat.completions.create(
-                        model="llama-3.1-8b-instant",
-                        messages=[
-                            {"role": "system", "content": f"Eres un asistente personal. Estas son las notas del usuario:\n{texto}\n\nResponde basándote únicamente en esas notas."},
-                            {"role": "user", "content": pregunta}
-                        ]
-                    )
-                    st.write(respuesta.choices[0].message.content)
+        texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
+
+        if "historial" not in st.session_state:
+            st.session_state.historial = []
+
+        for mensaje in st.session_state.historial:
+            if mensaje["role"] == "user":
+                st.chat_message("user").write(mensaje["content"])
+            else:
+                st.chat_message("assistant").write(mensaje["content"])
+
+        pregunta = st.chat_input("Escribe tu pregunta...")
+
+        if pregunta:
+            st.session_state.historial.append({"role": "user", "content": pregunta})
+            st.chat_message("user").write(pregunta)
+
+            with st.spinner("Consultando..."):
+                mensajes = [
+                    {"role": "system", "content": f"Eres un asistente personal. Estas son las notas del usuario:\n{texto}\n\nResponde basándote en esas notas."}
+                ] + st.session_state.historial
+
+                respuesta = cliente.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=mensajes
+                )
+
+                respuesta_texto = respuesta.choices[0].message.content
+                st.session_state.historial.append({"role": "assistant", "content": respuesta_texto})
+                st.chat_message("assistant").write(respuesta_texto)
