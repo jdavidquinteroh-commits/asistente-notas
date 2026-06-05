@@ -16,9 +16,22 @@ except:
 cliente = Groq(api_key=api_key)
 
 CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
+CONFIG_FILE = "config.yaml"
 
-with open("config.yaml") as f:
-    config = yaml.safe_load(f)
+def cargar_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE) as f:
+            return yaml.safe_load(f)
+    return {
+        "credentials": {"usernames": {}},
+        "cookie": {"expiry_days": 30, "key": "clave_secreta_123", "name": "asistente_notas"}
+    }
+
+def guardar_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        yaml.dump(config, f)
+
+config = cargar_config()
 
 authenticator = stauth.Authenticate(
     config["credentials"],
@@ -27,7 +40,38 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-authenticator.login()
+tab1, tab2 = st.tabs(["Iniciar sesión", "Registrarse"])
+
+with tab1:
+    authenticator.login()
+
+with tab2:
+    st.subheader("Crear cuenta nueva")
+    nuevo_nombre = st.text_input("Nombre completo", key="reg_nombre")
+    nuevo_usuario = st.text_input("Usuario (sin espacios)", key="reg_usuario")
+    nuevo_email = st.text_input("Email", key="reg_email")
+    nueva_password = st.text_input("Contraseña", type="password", key="reg_pass")
+    confirmar_password = st.text_input("Confirmar contraseña", type="password", key="reg_pass2")
+
+    if st.button("Crear cuenta"):
+        if not nuevo_nombre or not nuevo_usuario or not nuevo_email or not nueva_password:
+            st.error("Completa todos los campos")
+        elif nueva_password != confirmar_password:
+            st.error("Las contraseñas no coinciden")
+        elif nuevo_usuario in config["credentials"]["usernames"]:
+            st.error("Ese usuario ya existe")
+        elif " " in nuevo_usuario:
+            st.error("El usuario no puede tener espacios")
+        else:
+            hasher = stauth.Hasher()
+            password_hash = hasher.hash(nueva_password)
+            config["credentials"]["usernames"][nuevo_usuario] = {
+                "name": nuevo_nombre,
+                "email": nuevo_email,
+                "password": password_hash
+            }
+            guardar_config(config)
+            st.success("✓ Cuenta creada exitosamente. Ve a Iniciar sesión.")
 
 if st.session_state.get("authentication_status"):
     username = st.session_state["username"]
@@ -165,6 +209,3 @@ if st.session_state.get("authentication_status"):
 
 elif st.session_state.get("authentication_status") is False:
     st.error("Usuario o contraseña incorrectos")
-
-elif st.session_state.get("authentication_status") is None:
-    st.warning("Por favor inicia sesión")
