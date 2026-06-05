@@ -1,0 +1,10 @@
+credentials:
+  usernames:
+    jdavid:
+      email: jdavidquinteroh@gmail.com
+      name: Juan David
+      password: $2b$12$ppBpDUulhUWSSu6Cc5efk.T2626LXNu5kMBQcSNfpF9uU1Ir0Y7JG
+cookie:
+  expiry_days: 30
+  key: clave_secreta_123
+  name: asistente_notas

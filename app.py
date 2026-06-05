@@ -1,6 +1,8 @@
 import json
 import os
+import yaml
 import streamlit as st
+import streamlit_authenticator as stauth
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -13,128 +15,156 @@ except:
 
 cliente = Groq(api_key=api_key)
 
-ARCHIVO = "notas.json"
 CATEGORIAS = ["personal", "trabajo", "aprendizaje", "pendientes", "otro"]
 
-def cargar_notas():
-    if os.path.exists(ARCHIVO):
-        with open(ARCHIVO, "r") as f:
-            return json.load(f)
-    return []
+with open("config.yaml") as f:
+    config = yaml.safe_load(f)
 
-def guardar_notas(notas):
-    with open(ARCHIVO, "w") as f:
-        json.dump(notas, f)
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"]
+)
 
-st.title("📝 Asistente de Notas con IA")
+authenticator.login()
 
-notas = cargar_notas()
+if st.session_state.get("authentication_status"):
+    username = st.session_state["username"]
+    ARCHIVO = f"notas_{username}.json"
 
-opcion = st.sidebar.selectbox("¿Qué quieres hacer?", [
-    "Escribir una nota",
-    "Ver mis notas",
-    "Ver por categoría",
-    "Buscar notas",
-    "Analizar con IA",
-    "Preguntarle a la IA"
-])
+    authenticator.logout("Cerrar sesión", "sidebar")
+    st.sidebar.write(f"Hola, {st.session_state['name']} 👋")
 
-if opcion == "Escribir una nota":
-    st.header("✏️ Nueva nota")
-    texto = st.text_area("Escribe tu nota aquí")
-    categoria = st.selectbox("Categoría", CATEGORIAS)
-    if st.button("Guardar nota"):
-        if texto.strip():
-            notas.append({"texto": texto, "categoria": categoria})
-            guardar_notas(notas)
-            st.success(f"✓ Nota guardada en '{categoria}'")
-        else:
-            st.warning("Escribe algo antes de guardar")
+    def cargar_notas():
+        if os.path.exists(ARCHIVO):
+            with open(ARCHIVO, "r") as f:
+                return json.load(f)
+        return []
 
-elif opcion == "Ver mis notas":
-    st.header("📋 Todas mis notas")
-    if len(notas) == 0:
-        st.info("No tienes notas todavía")
-    else:
-        for i, nota in enumerate(notas):
-            with st.expander(f"{i + 1}. [{nota['categoria']}] {nota['texto'][:50]}"):
-                st.write(nota["texto"])
-                if st.button(f"Eliminar", key=f"del_{i}"):
-                    notas.pop(i)
-                    guardar_notas(notas)
-                    st.rerun()
+    def guardar_notas(notas):
+        with open(ARCHIVO, "w") as f:
+            json.dump(notas, f)
 
-elif opcion == "Ver por categoría":
-    st.header("🗂️ Notas por categoría")
-    categoria = st.selectbox("Elige una categoría", CATEGORIAS)
-    filtradas = [n for n in notas if n["categoria"] == categoria]
-    if len(filtradas) == 0:
-        st.info(f"No tienes notas en '{categoria}'")
-    else:
-        for i, nota in enumerate(filtradas):
-            st.write(f"{i + 1}. {nota['texto']}")
+    st.title("📝 Asistente de Notas con IA")
 
-elif opcion == "Buscar notas":
-    st.header("🔍 Buscar notas")
-    palabra = st.text_input("¿Qué quieres buscar?")
-    if palabra:
-        resultados = [n for n in notas if palabra.lower() in n["texto"].lower()]
-        if len(resultados) == 0:
-            st.warning(f"No encontré notas con '{palabra}'")
-        else:
-            st.success(f"Encontré {len(resultados)} nota(s)")
-            for i, nota in enumerate(resultados):
-                st.write(f"{i + 1}. [{nota['categoria']}] {nota['texto']}")
+    opcion = st.sidebar.selectbox("¿Qué quieres hacer?", [
+        "Escribir una nota",
+        "Ver mis notas",
+        "Ver por categoría",
+        "Buscar notas",
+        "Analizar con IA",
+        "Preguntarle a la IA"
+    ])
 
-elif opcion == "Analizar con IA":
-    st.header("🤖 Análisis con IA")
-    if len(notas) == 0:
-        st.info("No tienes notas para analizar")
-    else:
-        if st.button("Analizar mis notas"):
-            with st.spinner("Analizando..."):
-                texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
-                respuesta = cliente.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[
-                        {"role": "system", "content": "Eres un asistente personal que ayuda a organizar y resumir notas."},
-                        {"role": "user", "content": f"Estas son mis notas:\n{texto}\n\nResúmelas y dime qué temas principales estoy trabajando."}
-                    ]
-                )
-                st.write(respuesta.choices[0].message.content)
-
-elif opcion == "Preguntarle a la IA":
-    st.header("💬 Preguntarle a la IA")
-    if len(notas) == 0:
-        st.info("No tienes notas todavía")
-    else:
-        texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
-
-        if "historial" not in st.session_state:
-            st.session_state.historial = []
-
-        for mensaje in st.session_state.historial:
-            if mensaje["role"] == "user":
-                st.chat_message("user").write(mensaje["content"])
+    if opcion == "Escribir una nota":
+        notas = cargar_notas()
+        st.header("✏️ Nueva nota")
+        texto = st.text_area("Escribe tu nota aquí")
+        categoria = st.selectbox("Categoría", CATEGORIAS)
+        if st.button("Guardar nota"):
+            if texto.strip():
+                notas.append({"texto": texto, "categoria": categoria})
+                guardar_notas(notas)
+                st.success(f"✓ Nota guardada en '{categoria}'")
             else:
-                st.chat_message("assistant").write(mensaje["content"])
+                st.warning("Escribe algo antes de guardar")
 
-        pregunta = st.chat_input("Escribe tu pregunta...")
+    elif opcion == "Ver mis notas":
+        notas = cargar_notas()
+        st.header("📋 Todas mis notas")
+        if len(notas) == 0:
+            st.info("No tienes notas todavía")
+        else:
+            for i, nota in enumerate(notas):
+                with st.expander(f"{i + 1}. [{nota['categoria']}] {nota['texto'][:50]}"):
+                    st.write(nota["texto"])
+                    if st.button(f"Eliminar", key=f"del_{i}"):
+                        notas.pop(i)
+                        guardar_notas(notas)
+                        st.rerun()
 
-        if pregunta:
-            st.session_state.historial.append({"role": "user", "content": pregunta})
-            st.chat_message("user").write(pregunta)
+    elif opcion == "Ver por categoría":
+        notas = cargar_notas()
+        st.header("🗂️ Notas por categoría")
+        categoria = st.selectbox("Elige una categoría", CATEGORIAS)
+        filtradas = [n for n in notas if n["categoria"] == categoria]
+        if len(filtradas) == 0:
+            st.info(f"No tienes notas en '{categoria}'")
+        else:
+            for i, nota in enumerate(filtradas):
+                st.write(f"{i + 1}. {nota['texto']}")
 
-            with st.spinner("Consultando..."):
-                mensajes = [
-                    {"role": "system", "content": f"Eres un asistente personal. Estas son las notas del usuario:\n{texto}\n\nResponde basándote en esas notas."}
-                ] + st.session_state.historial
+    elif opcion == "Buscar notas":
+        notas = cargar_notas()
+        st.header("🔍 Buscar notas")
+        palabra = st.text_input("¿Qué quieres buscar?")
+        if palabra:
+            resultados = [n for n in notas if palabra.lower() in n["texto"].lower()]
+            if len(resultados) == 0:
+                st.warning(f"No encontré notas con '{palabra}'")
+            else:
+                st.success(f"Encontré {len(resultados)} nota(s)")
+                for i, nota in enumerate(resultados):
+                    st.write(f"{i + 1}. [{nota['categoria']}] {nota['texto']}")
 
-                respuesta = cliente.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=mensajes
-                )
+    elif opcion == "Analizar con IA":
+        notas = cargar_notas()
+        st.header("🤖 Análisis con IA")
+        if len(notas) == 0:
+            st.info("No tienes notas para analizar")
+        else:
+            if st.button("Analizar mis notas"):
+                with st.spinner("Analizando..."):
+                    texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
+                    respuesta = cliente.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=[
+                            {"role": "system", "content": "Eres un asistente personal que ayuda a organizar y resumir notas."},
+                            {"role": "user", "content": f"Estas son mis notas:\n{texto}\n\nResúmelas y dime qué temas principales estoy trabajando."}
+                        ]
+                    )
+                    st.write(respuesta.choices[0].message.content)
 
-                respuesta_texto = respuesta.choices[0].message.content
-                st.session_state.historial.append({"role": "assistant", "content": respuesta_texto})
-                st.chat_message("assistant").write(respuesta_texto)
+    elif opcion == "Preguntarle a la IA":
+        notas = cargar_notas()
+        st.header("💬 Preguntarle a la IA")
+        if len(notas) == 0:
+            st.info("No tienes notas todavía")
+        else:
+            texto = "\n".join([f"[{n['categoria']}] {n['texto']}" for n in notas])
+
+            if "historial" not in st.session_state:
+                st.session_state.historial = []
+
+            for mensaje in st.session_state.historial:
+                if mensaje["role"] == "user":
+                    st.chat_message("user").write(mensaje["content"])
+                else:
+                    st.chat_message("assistant").write(mensaje["content"])
+
+            pregunta = st.chat_input("Escribe tu pregunta...")
+
+            if pregunta:
+                st.session_state.historial.append({"role": "user", "content": pregunta})
+                st.chat_message("user").write(pregunta)
+
+                with st.spinner("Consultando..."):
+                    mensajes = [
+                        {"role": "system", "content": f"Eres un asistente personal. Estas son las notas del usuario:\n{texto}\n\nResponde basándote en esas notas."}
+                    ] + st.session_state.historial
+
+                    respuesta = cliente.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=mensajes
+                    )
+
+                    respuesta_texto = respuesta.choices[0].message.content
+                    st.session_state.historial.append({"role": "assistant", "content": respuesta_texto})
+                    st.chat_message("assistant").write(respuesta_texto)
+
+elif st.session_state.get("authentication_status") is False:
+    st.error("Usuario o contraseña incorrectos")
+
+elif st.session_state.get("authentication_status") is None:
+    st.warning("Por favor inicia sesión")
